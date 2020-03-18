@@ -1,1 +1,33 @@
-# main.ру
+import numpy as np
+count = 0                           
+number = np.random.randint(1,100)  
+print ("Загадано число от 1 до 99")
+
+def get_predict(lower,upper):
+    return int(lower + upper)//2
+def game(number,lower,upper):  
+
+    count = 0
+    predict = get_predict(lower,upper)
+    while number != predict:
+        count+=1
+        if number > predict: 
+            lower = predict+1
+        elif number < predict: 
+            upper = predict-1          
+        predict = get_predict(lower,upper)                 
+    return(count) 
+
+def score_game(game):
+    lower = 1
+    upper = 101
+    # Запускаем игру 1000 раз, чтобы узнать, как быстро игра угадывает число
+    count_ls = []
+    np.random.seed(1) 
+    random_array = np.random.randint(lower, upper, size=(1000))
+    for number in random_array:
+        count_ls.append(game(number,lower,upper))
+    score = int(np.mean(count_ls))
+    print ('Вы угадали число', number, 'за', count, 'попыток.')
+    return(score)
+score_game(game)
