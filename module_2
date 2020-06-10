@@ -1,3 +1,9 @@
+Цель: отследить влияние условий жизни учащихся в возрасте от 15 до 22 лет на их успеваемость по математике, чтобы на ранней стадии выявлять студентов, находящихся в группе риска.
+Задача: провести разведывательный анализ данных и составить отчёт по его результатам.
+
+conda install -c conda-forge jupyter_contrib_nbextensions
+pip install autopep8
+
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -5,10 +11,200 @@ from itertools import combinations
 from scipy.stats import ttest_ind
 
 
-pd.set_option('display.max_rows', 50) # показывать больше строк
-pd.set_option('display.max_columns', 50) # показывать больше колонок
+pd.set_option('display.max_rows', 50)  # показывать больше строк
+pd.set_option('display.max_columns', 50)  # показывать больше колонок
 
 study = pd.read_csv('stud_math.csv')
 display(study.head(10))
 study.info() 
+
+# Данный датасет содержит 395 строк и 30 колонок, из них 13 числовых и 17 строковых. Пропуски отсутствуют.
+
+pd.DataFrame(study.school.value_counts())
+
+# Нам представлены данные учеников двух школ. Посмотрим на распределение возрастов.
+print(study.age.nunique())
+plt.plot(study.age)
+# Выбросы и ошибки отсутствуют - возраст подростков срого от 15 до 22
+
+study.Medu.hist()
+study.Medu.describe()
+# В столюце об образовании матери так же отсутсвуют выбросы
+
+study.Fedu.hist()
+study.Fedu.describe()
+
+# В столбце об образовании отца есть выбросы. Убераем их:
+study.Fedu = study.Fedu.apply(lambda x: None if x > 4 else x)
+study.Fedu.hist()
+study.Fedu.describe()
+
+study.traveltime.hist()
+study.traveltime.describe()
+
+study.studytime.hist()
+study.studytime.describe()
+
+study.failures.hist()
+study.failures.describe()
+# В столбцах 'traveltime', 'studytime', 'failures' - выбросы отсутсвуют
+
+study.famrel.hist()
+study.famrel.describe()
+
+# Есть данные с отрицательными значениями
+study.famrel = study.famrel.apply(lambda x: None if x < 1 else x)
+study.famrel.hist()
+study.famrel.describe()
+
+study.freetime.hist()
+study.freetime.describe()
+#Выбросы и ошибки отсутствуют
+
+study.goout.hist()
+study.goout.describe()
+#Выбросы и ошибки отсутствуют
+
+study.health.hist()
+study.health.describe()
+#Выбросы и ошибки отсутствуют
+
+study.absences.hist()
+study.absences.describe()
+# Среднее (50%)- 4.0;  75-й перцентиль (Q3)- 8.0; Максимальное значение - 385. Скорее всего есть выбросы:
+
+median = study.absences.median()
+IQR = study.absences.quantile(0.75) - study.absences.quantile(0.25)
+perc25 = study.absences.quantile(0.25)
+perc75 = study.absences.quantile(0.75)
+print('25-й перцентиль: {},'.format(perc25), '75-й перцентиль: {},'.format(perc75),
+      "IQR: {}, ".format(IQR), "Границы выбросов: [{f}, {l}].".format(f=perc25 - 1.5*IQR, l=perc75 + 1.5*IQR))
+study.absences.loc[study.absences.between(perc25 - 1.5*IQR, perc75 + 1.5*IQR)].hist(bins=10, range=(0, 20),
+                                                                                    label='IQR')
+plt.legend()
+
+# Границы выбросов [-12.0, 20.0]
+study = study.loc[study.absences.between(perc25 - 1.5*IQR, perc75 + 1.5*IQR)]
+
+study.score.hist()
+study.score.describe()
+median = study.score.median()
+IQR = study.score.quantile(0.75) - study.score.quantile(0.25)
+perc25 = study.score.quantile(0.25)
+perc75 = study.score.quantile(0.75)
+print('25-й перцентиль: {},'.format(perc25), '75-й перцентиль: {},'.format(perc75),
+      "IQR: {}, ".format(IQR), "Границы выбросов: [{f}, {l}].".format(f=perc25 - 1.5*IQR, l=perc75 + 1.5*IQR))
+study.score.loc[study.score.between(perc25 - 1.5*IQR, perc75 + 1.5*IQR)].hist(bins=100, range=(0, 100),
+                                                                              label='IQR')
+plt.legend()
+
+# Выбросы в столбце 'score' отсутствуют
+
+sns.pairplot(study, kind='reg')
+study.corr()
+
+# Разобьем данные на четыре части: личностные (sex,age,higher,health), семейные (address,famsize,Pstatus,Medu,Fedu,Mjob,Fjob,reason,guardian,famsup,internet,famrel), учебные (school,studytime,schoolsup,paid,nursery,absences) и свободное время (traveltime,failures,activities,romantic,freetime,goout). И проверим корреляцию score с каждым параметром.
+# Личностные:
+sns.barplot(x='sex', y='score', data=study)
+# Средний балл мальчиков несущественно больше, чем у девочек. 
+
+sns.jointplot(x='age', y='score', data=study, kind='reg')
+# Оценки отрицательно коррелируют с возрастом. Скорее всего это связано с уменьшением количества госэкзаменов, сданных людьми старше 20ти
+
+sns.barplot(x='higher', y='score', data=study)
+# Как следует из графика: мотивация к дальнейшей учебе имеет большое значение
+
+sns.jointplot(x='health', y='score', data=study, kind='reg')
+# Текущее состояние здоровья практически не влияет.
+
+# Семья/Дом:
+sns.boxplot(x='address', y='score', data=study)
+# У детей, живущих в городе, средний балл чуть выше, чем у детей за городом
+
+sns.boxplot(x='famsize', y='score', data=study)
+# Размер семьи не имеет существенного влияния
+
+sns.boxplot(x='Pstatus', y='score', data=study)
+# Cтатус совместного проживание родителей тоже не имеет значения
+
+sns.jointplot(x='Medu', y='score', data=study, kind='reg')
+# Уровень образования матери имеет существенную корреляцию с баллами детей
+
+sns.jointplot(x='Fedu', y='score', data=study, kind='reg')
+# Уровень образование отца в чуть меньшей степени, но тоже влияет
+
+sns.boxplot(x='Mjob', y='score', data=study)
+pd.DataFrame(study.Mjob.value_counts())
+
+sns.boxplot(x='Fjob', y='score', data=study)
+pd.DataFrame(study.Fjob.value_counts())
+# Род занятости родителей также имеет значение
+
+sns.boxplot(x='reason', y='score', data=study)
+pd.DataFrame(study.reason.value_counts())
+
+sns.boxplot(x='guardian', y='score', data=study)
+pd.DataFrame(study.guardian.value_counts())
+# А вот причины выбора школы и опекун значения не имеют. Дети с опекуном - мамой имеют больший разброс в оценках, скорее всего потому, что таких детей в принципе больше.
+
+sns.boxplot(x='famsup', y='score', data=study)
+# Семейная образовательная поддержка не влияет
+
+sns.boxplot(x='internet', y='score', data=study)
+# Наличие дома интернета является положительным условием для хорошей сдачи экзамена
+
+pd.DataFrame(study.famrel.value_counts())
+sns.jointplot(x='famrel', y='score', data=study, kind='reg')
+# Семейные отношения имеют очень слабую корреляцию
+
+# Учеба:
+sns.boxplot(x='school', y='score', data=study)
+# Школа в данном случае не влияет
+
+sns.jointplot(x='studytime', y='score', data=study, kind='reg')
+# Время на учебу помимо школы влияет положительно
+
+sns.boxplot(x='schoolsup', y='score', data=study)
+pd.DataFrame(study.schoolsup.value_counts())
+# А вот дополнительная образовательная поддержка лишь мешает, но данных не достаточно для дальнейших выводов
+
+sns.boxplot(x='paid', y='score', data=study)
+pd.DataFrame(study.paid.value_counts())
+# Платные занятия бесполезны
+
+sns.boxplot(x='nursery', y='score', data=study)
+pd.DataFrame(study.nursery.value_counts())
+# Посещение детского сада приветствуется, но данных слишком мало для выводов.
+
+sns.jointplot(x='absences', y='score', data=study, kind='reg')
+# По графику виден недостаток данных о детях с большим количеством пропущенных занятий. Выводы делать нельзя
+
+# Свободное время:
+sns.jointplot(x='traveltime', y='score', data=study, kind='reg')
+# Недостаток данных - большинство детей живут недалеко от школы
+
+sns.jointplot(x='failures', y='score', data=study, kind='reg')
+# Даже не смотря на отсутсвие данных о более трех внеучебных неудач, заметна резкая обратная корреляция с оценками
+
+sns.boxplot(x='activities', y='score', data=study)
+# Влияние дополнительных внеучебных занятий несущественно
+
+sns.boxplot(x='romantic', y='score', data=study)
+# Наличие романтических отношений влияют на оценки отрицательно, как и количество времени, проведенное с друзьями
+sns.jointplot(x='goout', y='score', data=study, kind='reg')
+
+sns.jointplot(x='freetime', y='score', data=study, kind='reg')
+# Количество свободного времени не влияет
+
+В результате EDA для анализа влияния условий жизни учащихся в возрасте от 15 до 22 лет на их успеваемость по математике, были получены следующие выводы:
+
+- В данных отсутствуют пустые значения
+- Выбросы найдены только в столбцах об образовании отцов, о семейных отношениях и пропущенных уроках, что позволяет сделать вывод о том, что данные достаточно чистые
+- Самое сильное влияние на оценку учащихся имеют:
+Личностный параметр - желание получить высшее образование (higher),
+Семейные параметры, такие как образование родителей (Medu, Fedu), работа мамы (Mjob), наличие интернета дома (internet),
+Учебный параметр - время на учёбу помимо школы (studytime)
+И отрицательно влияют такие параметры, как внеучебные неудачи (failures), романтические отношения (romantic) и время, проведенное с друзьями (goout)
+
+Влияют в меньшей степени: адрес (address) и работа папы (Fjob)
 
